@@ -24,15 +24,12 @@ public class ForegroundCallService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
-        Log.d("MainActivity", "BUM! Запуск ForegroundService");
         startForegroundService();
-        Log.d("ForegroundCallService", "BUM! Service started");
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && STOP_SERVICE_ACTION.equals(intent.getAction())) {
-            Log.d("ForegroundCallService", "BUM! OnStartCommand");
             stopForeground(true);
             stopSelf();
         }
@@ -41,28 +38,27 @@ public class ForegroundCallService extends Service {
 
     @Override
     public IBinder onBind(Intent intent) {
-        // Этот сервис не поддерживает привязку, поэтому возвращаем null
         return null;
     }
 
     private void startForegroundService() {
-
-        Log.d("ForegroundCallService", "BUM! startForeignService");
-
         createNotificationChannel();
 
         Intent stopSelfIntent = new Intent(this, ForegroundCallService.class);
         stopSelfIntent.setAction(STOP_SERVICE_ACTION);
         PendingIntent stopSelfPendingIntent = PendingIntent.getService(this, 0, stopSelfIntent, PendingIntent.FLAG_IMMUTABLE);
 
+        // Создаем уведомление
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("Сервис работает")
                 .setContentText("Нажмите 'Отключить' для остановки")
                 .setSmallIcon(R.drawable.ic_phone)
                 .addAction(R.drawable.ic_stop, "Отключить", stopSelfPendingIntent)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setOngoing(true)  // Постоянное уведомление
                 .build();
 
+        // Стартуем сервис на переднем плане
         startForeground(1, notification);
     }
 
@@ -71,7 +67,7 @@ public class ForegroundCallService extends Service {
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID,
                     "Call Service Channel",
-                    NotificationManager.IMPORTANCE_DEFAULT
+                    NotificationManager.IMPORTANCE_HIGH  // Используй высокий приоритет
             );
             NotificationManager manager = (NotificationManager) getSystemService(NotificationManager.class);
             if (manager != null) {
