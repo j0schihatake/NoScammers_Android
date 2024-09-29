@@ -1,6 +1,7 @@
 package com.example.noscammer;
 
 import android.Manifest;
+import android.app.NotificationManager;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
@@ -19,6 +20,7 @@ import com.example.noscammer.services.ForegroundCallService;
 public class MainActivity extends AppCompatActivity {
 
     private static final int PERMISSION_REQUEST_CODE = 100;
+    private static final int NOTIFICATION_PERMISSION_REQUEST_CODE = 101;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -31,15 +33,15 @@ public class MainActivity extends AppCompatActivity {
     // Метод для проверки всех необходимых разрешений
     private void checkAndRequestPermissions() {
         if (checkPermissions()) {
-            // Если все разрешения предоставлены, запускаем сервис
-            startServiceAndFinish();
+            // Если все разрешения предоставлены, проверяем разрешение на уведомления
+            checkNotificationPermission();
         } else {
             // Запрашиваем разрешения
             requestPermissions();
         }
     }
 
-    // Метод для проверки всех разрешений
+    // Метод для проверки всех стандартных разрешений
     private boolean checkPermissions() {
         String[] permissions = {
                 Manifest.permission.READ_PHONE_STATE,
@@ -48,16 +50,15 @@ public class MainActivity extends AppCompatActivity {
         };
 
         // Если хотя бы одно из разрешений не предоставлено, возвращаем false
-        for (int i = 0; i < permissions.length; i++) {
-            String permission = permissions[i];
+        for (String permission : permissions) {
             if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
                 return false;
             }
         }
-        return true;  // Все разрешения предоставлены
+        return true;  // Все стандартные разрешения предоставлены
     }
 
-    // Метод для запроса разрешений
+    // Метод для запроса стандартных разрешений
     private void requestPermissions() {
         String[] permissions = {
                 Manifest.permission.READ_PHONE_STATE,
@@ -81,6 +82,22 @@ public class MainActivity extends AppCompatActivity {
         ActivityCompat.requestPermissions(this, permissions, PERMISSION_REQUEST_CODE);
     }
 
+    // Метод для проверки разрешения на уведомления (для Android 13 и выше)
+    private void checkNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= 33) {  // Используем числовое значение для Android 13 и выше
+            // Проверяем, доступны ли уведомления
+            NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+            if (!notificationManager.areNotificationsEnabled()) {
+                // Проверяем, есть ли разрешение на отправку уведомлений
+                ActivityCompat.requestPermissions(this, new String[]{"android.permission.POST_NOTIFICATIONS"}, NOTIFICATION_PERMISSION_REQUEST_CODE);
+                return;
+            }
+        }
+
+        // Если все разрешения предоставлены, запускаем сервис и закрываем активность
+        startServiceAndFinish();
+    }
+
     // Обработка результата запроса разрешений
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
@@ -88,8 +105,8 @@ public class MainActivity extends AppCompatActivity {
 
         if (requestCode == PERMISSION_REQUEST_CODE) {
             if (checkPermissions()) {
-                // Разрешения предоставлены
-                startServiceAndFinish();
+                // Проверяем разрешение на уведомления
+                checkNotificationPermission();
             } else {
                 // Если разрешения не предоставлены
                 boolean shouldShowRationale = false;
@@ -104,7 +121,18 @@ public class MainActivity extends AppCompatActivity {
                     // Если выбрано "не спрашивать снова"
                     showGoToSettingsDialog();
                 } else {
-                    finish();  // Закрываем активность, если разрешения отклонены
+                    Toast.makeText(this, "Разрешения отклонены.", Toast.LENGTH_SHORT).show();
+                }
+            }
+        } else if (requestCode == NOTIFICATION_PERMISSION_REQUEST_CODE) {
+            // Обработка результата запроса разрешений для уведомлений
+            if (Build.VERSION.SDK_INT >= 33) {
+                NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+                if (notificationManager != null && notificationManager.areNotificationsEnabled()) {
+                    // Если разрешение на уведомления предоставлено, запускаем сервис
+                    startServiceAndFinish();
+                } else {
+                    Toast.makeText(this, "Разрешение на уведомления отклонено.", Toast.LENGTH_SHORT).show();
                 }
             }
         }
@@ -127,8 +155,8 @@ public class MainActivity extends AppCompatActivity {
 
         // Проверяем разрешения при возврате из настроек
         if (checkPermissions()) {
-            // Если разрешения предоставлены, запускаем сервис и закрываем активность
-            startServiceAndFinish();
+            // Проверяем разрешение на уведомления
+            checkNotificationPermission();
         }
     }
 
@@ -141,6 +169,7 @@ public class MainActivity extends AppCompatActivity {
             startService(serviceIntent);
         }
 
-        finish();  // Закрываем активность после старта сервиса
+        // Закрываем активность после старта сервиса
+        finish();
     }
 }

@@ -1,19 +1,14 @@
 package com.example.noscammer.services;
 
-import android.annotation.SuppressLint;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
-import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
 import android.os.IBinder;
-import android.util.Log;
-
 import androidx.core.app.NotificationCompat;
-
 import com.example.noscammer.R;
 
 public class ForegroundCallService extends Service {
@@ -30,10 +25,10 @@ public class ForegroundCallService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && STOP_SERVICE_ACTION.equals(intent.getAction())) {
-            stopForeground(true);
-            stopSelf();
+            stopForeground(true);  // Останавливаем Foreground Service
+            stopSelf();  // Останавливаем сам сервис
         }
-        return START_STICKY;
+        return START_STICKY;  // Чтобы сервис перезапускался при необходимости
     }
 
     @Override
@@ -42,6 +37,7 @@ public class ForegroundCallService extends Service {
     }
 
     private void startForegroundService() {
+
         createNotificationChannel();
 
         Intent stopSelfIntent = new Intent(this, ForegroundCallService.class);
@@ -58,7 +54,7 @@ public class ForegroundCallService extends Service {
                 .setOngoing(true)  // Постоянное уведомление
                 .build();
 
-        // Стартуем сервис на переднем плане
+        // Запускаем сервис на переднем плане
         startForeground(1, notification);
     }
 
@@ -67,7 +63,7 @@ public class ForegroundCallService extends Service {
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID,
                     "Call Service Channel",
-                    NotificationManager.IMPORTANCE_HIGH  // Используй высокий приоритет
+                    NotificationManager.IMPORTANCE_HIGH
             );
             NotificationManager manager = (NotificationManager) getSystemService(NotificationManager.class);
             if (manager != null) {
@@ -79,5 +75,6 @@ public class ForegroundCallService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
+        stopForeground(true);  // Убедись, что сервис остановлен
     }
 }
