@@ -50,7 +50,7 @@ public class ForegroundCallService extends Service {
 
         // Создаем уведомление
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("Сервис работает")
+                .setContentTitle("Сервис отклонение неизвестных номеров работает")
                 .setContentText("Нажмите 'Отключить' для остановки")
                 .setSmallIcon(R.drawable.ic_phone)
                 .addAction(R.drawable.ic_stop, "Отключить", stopSelfPendingIntent)
