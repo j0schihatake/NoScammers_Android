@@ -18,11 +18,8 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-
-        checkPermissions();
-
         startForegroundService();
+        finish();
     }
 
     /**
@@ -47,6 +44,5 @@ public class MainActivity extends AppCompatActivity {
         } else {
             startService(serviceIntent);
         }
-        finish();
     }
 }
