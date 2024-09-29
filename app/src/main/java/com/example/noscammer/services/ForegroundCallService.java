@@ -10,6 +10,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
 import android.os.IBinder;
+import android.util.Log;
 
 import androidx.core.app.NotificationCompat;
 
@@ -23,12 +24,15 @@ public class ForegroundCallService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        Log.d("MainActivity", "BUM! Запуск ForegroundService");
         startForegroundService();
+        Log.d("ForegroundCallService", "BUM! Service started");
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && STOP_SERVICE_ACTION.equals(intent.getAction())) {
+            Log.d("ForegroundCallService", "BUM! OnStartCommand");
             stopForeground(true);
             stopSelf();
         }
@@ -42,6 +46,9 @@ public class ForegroundCallService extends Service {
     }
 
     private void startForegroundService() {
+
+        Log.d("ForegroundCallService", "BUM! startForeignService");
+
         createNotificationChannel();
 
         Intent stopSelfIntent = new Intent(this, ForegroundCallService.class);
