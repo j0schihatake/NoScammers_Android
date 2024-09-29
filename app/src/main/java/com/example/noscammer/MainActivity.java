@@ -84,12 +84,17 @@ public class MainActivity extends AppCompatActivity {
 
     // Метод для проверки разрешения на уведомления (для Android 13 и выше)
     private void checkNotificationPermission() {
-        if (Build.VERSION.SDK_INT >= 33) {  // Используем числовое значение для Android 13 и выше
-            // Проверяем, доступны ли уведомления
+        if (Build.VERSION.SDK_INT >= 33) {
             NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
             if (!notificationManager.areNotificationsEnabled()) {
-                // Проверяем, есть ли разрешение на отправку уведомлений
-                ActivityCompat.requestPermissions(this, new String[]{"android.permission.POST_NOTIFICATIONS"}, NOTIFICATION_PERMISSION_REQUEST_CODE);
+                // Проверяем, был ли выбран параметр "не спрашивать снова"
+                if (!ActivityCompat.shouldShowRequestPermissionRationale(this, "android.permission.POST_NOTIFICATIONS")) {
+                    // Если уведомления были отклонены ранее, сразу предлагаем перейти в настройки
+                    showGoToSettingsDialog();
+                } else {
+                    // Запрашиваем разрешение на уведомления
+                    ActivityCompat.requestPermissions(this, new String[]{"android.permission.POST_NOTIFICATIONS"}, NOTIFICATION_PERMISSION_REQUEST_CODE);
+                }
                 return;
             }
         }
@@ -132,7 +137,7 @@ public class MainActivity extends AppCompatActivity {
                     // Если разрешение на уведомления предоставлено, запускаем сервис
                     startServiceAndFinish();
                 } else {
-                    Toast.makeText(this, "Разрешение на уведомления отклонено.", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Разрешение на уведомления отклонено. Перейдите в настройки, чтобы включить его.", Toast.LENGTH_LONG).show();
                 }
             }
         }
@@ -140,7 +145,7 @@ public class MainActivity extends AppCompatActivity {
 
     // Метод для показа диалога с предложением открыть настройки
     private void showGoToSettingsDialog() {
-        Toast.makeText(this, "Перейдите в настройки, чтобы предоставить разрешения.", Toast.LENGTH_LONG).show();
+        Toast.makeText(this, "Разрешение на уведомления отклонено. Перейдите в настройки, чтобы предоставить его.", Toast.LENGTH_LONG).show();
         new Handler().postDelayed(() -> {
             Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
             Uri uri = Uri.fromParts("package", getPackageName(), null);
