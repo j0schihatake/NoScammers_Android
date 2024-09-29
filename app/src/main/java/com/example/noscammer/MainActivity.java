@@ -48,7 +48,8 @@ public class MainActivity extends AppCompatActivity {
         };
 
         // Если хотя бы одно из разрешений не предоставлено, возвращаем false
-        for (String permission : permissions) {
+        for (int i = 0; i < permissions.length; i++) {
+            String permission = permissions[i];
             if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
                 return false;
             }
