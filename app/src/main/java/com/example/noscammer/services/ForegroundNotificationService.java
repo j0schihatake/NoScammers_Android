@@ -27,6 +27,7 @@ public class ForegroundNotificationService extends Service {
         if (intent != null && STOP_SERVICE_ACTION.equals(intent.getAction())) {
             stopForeground(true);  // Останавливаем Foreground Service
             stopSelf();  // Останавливаем сам сервис
+            stopOtherServices();  // Останавливаем остальные сервисы
         }
         return START_STICKY;
     }
@@ -37,7 +38,6 @@ public class ForegroundNotificationService extends Service {
     }
 
     private void startForegroundService() {
-
         createNotificationChannel();
 
         Intent stopSelfIntent = new Intent(this, ForegroundNotificationService.class);
@@ -74,5 +74,11 @@ public class ForegroundNotificationService extends Service {
     public void onDestroy() {
         super.onDestroy();
         stopForeground(true);  // Останавливаем уведомление
+    }
+
+    private void stopOtherServices() {
+        // Останавливаем сервисы при завершении работы
+        Intent callServiceIntent = new Intent(this, ForegroundCallService.class);
+        stopService(callServiceIntent);
     }
 }
