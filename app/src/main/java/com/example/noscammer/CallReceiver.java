@@ -1,6 +1,7 @@
 package com.example.noscammer;
 
 import android.content.Context;
+import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
 import android.provider.ContactsContract;
@@ -23,20 +24,26 @@ public class CallReceiver extends InCallService {
         super.onCallAdded(call);
         call.registerCallback(callCallback);
 
-        message("Добавлен новый звонок: " + call.getDetails().getHandle().getSchemeSpecificPart());
-
-        // Получаем все номера из телефонной книги
-        Set<String> contacts = getAllContactNumbers(this);
+        // Получаем номер звонка
         String incomingNumber = call.getDetails().getHandle().getSchemeSpecificPart();
+        Set<String> contacts = getAllContactNumbers(this);
 
-        // Проверяем, есть ли входящий номер в контактах
+        // Если номер есть в контактах, показываем интерфейс
         if (contacts.contains(incomingNumber)) {
-            message("Номер в телефонной книге: " + incomingNumber);
-            return;  // Номер найден, ничего не делаем
+            Log.d("CallReceiver", "Номер найден в контактах: " + incomingNumber);
+            CallManager.setCurrentCall(call);  // Сохраняем текущий звонок
+            showCallActivity();  // Показываем интерфейс для управления звонком
+            return;
         }
 
-        // Отклоняем звонок, если номер не в контактах
+        // Если номер не найден в контактах, отклоняем звонок
         rejectCall(call);
+    }
+
+    private void showCallActivity() {
+        Intent intent = new Intent(this, CallActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        startActivity(intent);
     }
 
     @Override
