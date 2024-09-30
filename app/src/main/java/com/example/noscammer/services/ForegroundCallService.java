@@ -1,150 +1,120 @@
 package com.example.noscammer.services;
 
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
-import android.database.Cursor;
-import android.graphics.PixelFormat;
-import android.net.Uri;
-import android.provider.ContactsContract;
+import android.os.Build;
 import android.telecom.Call;
 import android.telecom.InCallService;
 import android.util.Log;
-import android.view.Gravity;
-import android.view.LayoutInflater;
-import android.view.View;
-import android.view.WindowManager;
-import android.widget.Button;
-import android.widget.TextView;
-import android.widget.Toast;
 
-import com.example.noscammer.CallManager;
+import androidx.core.app.NotificationCompat;
+
+import com.example.noscammer.CallUtils;
 import com.example.noscammer.R;
-
-import java.util.HashSet;
-import java.util.Set;
+import com.example.noscammer.CallManager;
 
 public class ForegroundCallService extends InCallService {
 
     private static final String TAG = "ForegroundCallService";
-    private WindowManager windowManager;
-    private View callView;
+    private static final String CHANNEL_ID = "incoming_call_channel";
+    private static final String ACTION_ACCEPT_CALL = "com.example.noscammer.ACCEPT_CALL";
+    private static final String ACTION_REJECT_CALL = "com.example.noscammer.REJECT_CALL";
 
     @Override
     public void onCallAdded(Call call) {
         super.onCallAdded(call);
         call.registerCallback(callCallback);
 
-        // Получаем номер звонка
         String incomingNumber = call.getDetails().getHandle().getSchemeSpecificPart();
-        Set<String> contacts = getAllContactNumbers(this);
+        Log.d(TAG, "Номер входящего звонка: " + incomingNumber);
 
-        // Если номер есть в контактах, не вмешиваемся
-        if (contacts.contains(incomingNumber)) {
-            Log.d("ForegroundCallService", "Номер найден в контактах: " + incomingNumber);
-            return; // Ничего не делаем, стандартная система обработает звонок
+        // Если номер в контактах, показываем уведомление с опциями
+        if (CallUtils.isNumberInContacts(incomingNumber, getApplicationContext())) {
+            Log.d(TAG, "Номер найден в контактах, показываем уведомление.");
+            CallManager.setCurrentCall(call);  // Сохраняем текущий звонок
+            showIncomingCallNotification(incomingNumber);  // Показываем уведомление
+        } else {
+            // Если номер не в контактах, отклоняем звонок
+            Log.d(TAG, "Номер не в контактах, отклоняем звонок.");
+            CallUtils.rejectCall(call);
+        }
+    }
+
+    private void showIncomingCallNotification(String incomingNumber) {
+        NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        createNotificationChannel(notificationManager);
+
+        Intent acceptIntent = new Intent(this, ForegroundCallService.class);
+        acceptIntent.setAction(ACTION_ACCEPT_CALL);
+        PendingIntent acceptPendingIntent = PendingIntent.getService(this, 0, acceptIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
+        Intent rejectIntent = new Intent(this, ForegroundCallService.class);
+        rejectIntent.setAction(ACTION_REJECT_CALL);
+        PendingIntent rejectPendingIntent = PendingIntent.getService(this, 1, rejectIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
+        Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
+                .setContentTitle("Входящий звонок")
+                .setContentText("Номер: " + incomingNumber)
+                .setSmallIcon(R.drawable.base)
+                .addAction(R.drawable.ic_phone, "Принять", acceptPendingIntent)
+                .addAction(R.drawable.ic_stop, "Отклонить", rejectPendingIntent)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setOngoing(true)  // Уведомление будет оставаться до завершения звонка
+                .build();
+
+        notificationManager.notify(1, notification);
+    }
+
+    private void createNotificationChannel(NotificationManager notificationManager) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                    CHANNEL_ID,
+                    "Входящие звонки",
+                    NotificationManager.IMPORTANCE_HIGH
+            );
+            notificationManager.createNotificationChannel(channel);
+        }
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        Call currentCall = CallManager.getCurrentCall();
+
+        if (intent != null && currentCall != null) {
+            String action = intent.getAction();
+            if (ACTION_ACCEPT_CALL.equals(action)) {
+                currentCall.answer(Call.STATE_ACTIVE);
+                removeNotification();
+            } else if (ACTION_REJECT_CALL.equals(action)) {
+                currentCall.reject(false, null);
+                removeNotification();
+            }
         }
 
-        // Если номер не найден в контактах, отклоняем звонок
-        CallManager.setCurrentCall(call);
-        showCallPanel(incomingNumber);  // Показываем панель звонка
+        return START_STICKY;
+    }
+
+    private void removeNotification() {
+        NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        notificationManager.cancel(1);
     }
 
     @Override
     public void onCallRemoved(Call call) {
         super.onCallRemoved(call);
         call.unregisterCallback(callCallback);
-        removeCallPanel();
         Log.d(TAG, "Звонок удален");
-    }
-
-    // Метод для отображения панели звонка
-    private void showCallPanel(String incomingNumber) {
-        if (windowManager != null && callView != null) {
-            return; // Панель уже отображается
-        }
-
-        // Настройка WindowManager
-        windowManager = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
-        WindowManager.LayoutParams params = new WindowManager.LayoutParams(
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
-                PixelFormat.TRANSLUCENT
-        );
-        params.gravity = Gravity.TOP;
-
-        // Создаем и отображаем кастомную панель
-        LayoutInflater inflater = (LayoutInflater) getSystemService(Context.LAYOUT_INFLATER_SERVICE);
-        callView = inflater.inflate(R.layout.activity_call, null);
-
-        // Настройка кнопок принятия и отклонения вызова
-        Button acceptButton = callView.findViewById(R.id.acceptButton);
-        Button rejectButton = callView.findViewById(R.id.rejectButton);
-        TextView callerNumber = callView.findViewById(R.id.callerNumber);
-        callerNumber.setText(incomingNumber);
-
-        // Обработка принятия вызова
-        acceptButton.setOnClickListener(v -> {
-            Call currentCall = CallManager.getCurrentCall();
-            if (currentCall != null) {
-                currentCall.answer(Call.STATE_ACTIVE);
-                removeCallPanel(); // Убираем панель после принятия вызова
-            }
-        });
-
-        // Обработка отклонения вызова
-        rejectButton.setOnClickListener(v -> {
-            Call currentCall = CallManager.getCurrentCall();
-            if (currentCall != null) {
-                currentCall.reject(false, null);
-                removeCallPanel(); // Убираем панель после отклонения вызова
-            }
-        });
-
-        windowManager.addView(callView, params);
-    }
-
-    // Метод для удаления панели звонка
-    private void removeCallPanel() {
-        if (windowManager != null && callView != null) {
-            windowManager.removeView(callView);
-            callView = null;
-        }
-    }
-
-    // Метод для получения всех номеров из телефонной книги
-    private Set<String> getAllContactNumbers(Context context) {
-        Set<String> contacts = new HashSet<>();
-        Uri uri = ContactsContract.CommonDataKinds.Phone.CONTENT_URI;
-        String[] projection = {ContactsContract.CommonDataKinds.Phone.NUMBER};
-        Cursor cursor = context.getContentResolver().query(uri, projection, null, null, null);
-
-        if (cursor != null) {
-            while (cursor.moveToNext()) {
-                String phoneNumber = cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.Phone.NUMBER));
-                contacts.add(phoneNumber.replaceAll("\\s+", ""));  // Убираем пробелы из номеров для корректного сравнения
-            }
-            cursor.close();
-        } else {
-            Log.e(TAG, "Не удалось получить список контактов.");
-        }
-
-        return contacts;
+        removeNotification();
     }
 
     private final Call.Callback callCallback = new Call.Callback() {
         @Override
         public void onStateChanged(Call call, int state) {
-            super.onStateChanged(call, state);
             Log.d(TAG, "Состояние звонка изменено: " + state);
         }
     };
-
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        // Гарантируем, что сервис продолжает работать даже после отклонения звонка
-        Log.d(TAG, "ForegroundCallService запущен");
-        return START_STICKY;
-    }
 }
