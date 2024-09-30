@@ -26,10 +26,10 @@ public class ForegroundNotificationService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && STOP_SERVICE_ACTION.equals(intent.getAction())) {
-            stopForeground(true);  // Останавливаем Foreground Service
-            stopSelf();  // Останавливаем сам сервис
+            stopForeground(true);                                                    // Останавливаем Foreground Service
+            stopSelf();                                                                             // Останавливаем сам сервис
         }
-        return START_STICKY;  // Чтобы сервис перезапускался при необходимости
+        return START_STICKY;                                                                        // Чтобы сервис перезапускался при необходимости
     }
 
     @Override
@@ -52,7 +52,7 @@ public class ForegroundNotificationService extends Service {
                 .setSmallIcon(R.drawable.base)
                 .addAction(R.drawable.ic_stop, "Отключить", stopSelfPendingIntent)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setOngoing(true)  // Постоянное уведомление
+                .setOngoing(true)                                                                   // Постоянное уведомление
                 .build();
 
         // Запускаем сервис на переднем плане
@@ -76,6 +76,6 @@ public class ForegroundNotificationService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        stopForeground(true);  // Убедись, что сервис остановлен
+        stopForeground(true);                                                        // Убедись, что сервис остановлен
     }
 }

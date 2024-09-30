@@ -1,7 +1,5 @@
 package com.example.noscammer.services;
 
-import static com.example.noscammer.CallUtils.rejectCall;
-
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -18,6 +16,7 @@ import android.util.Log;
 
 import androidx.core.app.NotificationCompat;
 
+import com.example.noscammer.CallUtils;
 import com.example.noscammer.R;
 import com.example.noscammer.CallManager;
 
@@ -29,6 +28,8 @@ public class ForegroundCallService extends InCallService {
     private static final String ACTION_ACCEPT_CALL = "com.example.noscammer.ACCEPT_CALL";
     private static final String ACTION_REJECT_CALL = "com.example.noscammer.REJECT_CALL";
     private static final String ACTION_STOP_SERVICE = "com.example.noscammer.STOP_SERVICE";
+    private static final int NOTIFICATION_ID = 1;
+    private static final int INCOMING_CALL_NOTIFICATION_ID = 2;
 
     @Override
     public void onCreate() {
@@ -56,7 +57,7 @@ public class ForegroundCallService extends InCallService {
                 .build();
 
         // Запускаем сервис на переднем плане
-        startForeground(1, notification);
+        startForeground(NOTIFICATION_ID, notification);
     }
 
     // Метод для создания основного канала уведомлений
@@ -92,39 +93,42 @@ public class ForegroundCallService extends InCallService {
         if (contactName != null) {
             Log.d(TAG, "Номер найден в контактах, показываем уведомление.");
             CallManager.setCurrentCall(call);  // Сохраняем текущий звонок
-            showIncomingCallNotification(contactName, incomingNumber);  // Показываем уведомление
+            showIncomingCallNotification(contactName, incomingNumber, true);  // Показываем уведомление с кнопкой "Принять"
         } else {
             // Если номер не в контактах, отклоняем звонок
             Log.d(TAG, "Номер не в контактах, отклоняем звонок.");
-            rejectCall(call);
+            CallUtils.rejectCall(call);
         }
     }
 
     // Метод для отображения уведомления с кнопками "Принять" и "Отклонить"
-    private void showIncomingCallNotification(String contactName, String incomingNumber) {
+    private void showIncomingCallNotification(String contactName, String incomingNumber, boolean showAcceptButton) {
         NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         createIncomingCallNotificationChannel(notificationManager);
 
-        Intent acceptIntent = new Intent(this, ForegroundCallService.class);
-        acceptIntent.setAction(ACTION_ACCEPT_CALL);
-        PendingIntent acceptPendingIntent = PendingIntent.getService(this, 0, acceptIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-
+        // Intent для отклонения звонка
         Intent rejectIntent = new Intent(this, ForegroundCallService.class);
         rejectIntent.setAction(ACTION_REJECT_CALL);
         PendingIntent rejectPendingIntent = PendingIntent.getService(this, 1, rejectIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
-        // Уведомление о входящем звонке с отображением имени контакта или номера
-        Notification notification = new NotificationCompat.Builder(this, INCOMING_CALL_CHANNEL_ID)
-                .setContentTitle("Входящий звонок от: " + (contactName != null ? contactName : incomingNumber))
+        NotificationCompat.Builder notificationBuilder = new NotificationCompat.Builder(this, INCOMING_CALL_CHANNEL_ID)
+                .setContentTitle(contactName != null ? contactName : incomingNumber)
                 .setContentText("Номер: " + incomingNumber)
                 .setSmallIcon(R.drawable.base)
-                .addAction(R.drawable.ic_phone, "Принять", acceptPendingIntent)
                 .addAction(R.drawable.ic_stop, "Отклонить", rejectPendingIntent)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setOngoing(true)
-                .build();
+                .setOngoing(true);
 
-        notificationManager.notify(2, notification);
+        // Добавляем кнопку "Принять", если нужно
+        if (showAcceptButton) {
+            Intent acceptIntent = new Intent(this, ForegroundCallService.class);
+            acceptIntent.setAction(ACTION_ACCEPT_CALL);
+            PendingIntent acceptPendingIntent = PendingIntent.getService(this, 0, acceptIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            notificationBuilder.addAction(R.drawable.ic_phone, "Принять", acceptPendingIntent);
+        }
+
+        Notification notification = notificationBuilder.build();
+        notificationManager.notify(INCOMING_CALL_NOTIFICATION_ID, notification);
     }
 
     // Метод для создания канала уведомлений для входящих звонков
@@ -147,11 +151,12 @@ public class ForegroundCallService extends InCallService {
             String action = intent.getAction();
             if (ACTION_ACCEPT_CALL.equals(action) && currentCall != null) {
                 currentCall.answer(Call.STATE_ACTIVE);
-                removeNotification();  // Убираем уведомление после принятия звонка
+                showIncomingCallNotification(null, null, false);  // Убираем кнопку "Принять" из уведомления
             } else if (ACTION_REJECT_CALL.equals(action) && currentCall != null) {
                 currentCall.reject(false, null);
-                removeNotification();  // Убираем уведомление после отклонения звонка
+                removeNotification(INCOMING_CALL_NOTIFICATION_ID);  // Убираем уведомление после отклонения звонка
             } else if (ACTION_STOP_SERVICE.equals(action)) {
+                removeNotification(NOTIFICATION_ID); // Убираем основное уведомление
                 stopForeground(true);  // Останавливаем foreground service
                 stopSelf();  // Полностью останавливаем сервис
             }
@@ -160,12 +165,10 @@ public class ForegroundCallService extends InCallService {
         return START_STICKY;
     }
 
-    // Метод для удаления уведомления о звонке
-    private void removeNotification() {
+    // Метод для удаления уведомления
+    private void removeNotification(int notificationId) {
         NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-        notificationManager.cancel(2);
-        // После завершения звонка возвращаем основную нотификацию
-        startForegroundServiceWithBasicNotification();
+        notificationManager.cancel(notificationId);
     }
 
     @Override
@@ -173,7 +176,7 @@ public class ForegroundCallService extends InCallService {
         super.onCallRemoved(call);
         call.unregisterCallback(callCallback);
         Log.d(TAG, "Звонок удален");
-        removeNotification();
+        removeNotification(INCOMING_CALL_NOTIFICATION_ID);  // Убираем уведомление о звонке
     }
 
     private final Call.Callback callCallback = new Call.Callback() {

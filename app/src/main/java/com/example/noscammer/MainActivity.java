@@ -1,16 +1,12 @@
 package com.example.noscammer;
 
 import android.Manifest;
-import android.app.NotificationManager;
 import android.app.role.RoleManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.provider.Settings;
-import android.os.Handler;
 import android.telecom.TelecomManager;
 import android.util.Log;
 import android.widget.Toast;
