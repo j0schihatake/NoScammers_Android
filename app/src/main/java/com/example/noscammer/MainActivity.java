@@ -2,6 +2,8 @@ package com.example.noscammer;
 
 import android.Manifest;
 import android.app.NotificationManager;
+import android.app.role.RoleManager;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
@@ -9,6 +11,8 @@ import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.os.Handler;
+import android.telecom.TelecomManager;
+import android.util.Log;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -21,14 +25,53 @@ public class MainActivity extends AppCompatActivity {
 
     private static final int PERMISSION_REQUEST_CODE = 100;
     private static final int NOTIFICATION_PERMISSION_REQUEST_CODE = 101;
+    private static final int CHANGE_DEFAULT_DIALER_CODE =25 ;
+    private static final int REQUEST_SET_DEFAULT_DIALER = 123;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Проверяем все необходимые разрешения
+        // Проверяем, назначено ли наше приложение dialer по умолчанию
+        checkAndSetDefaultDialer();
+
         checkAndRequestPermissions();
     }
+
+    // Метод для проверки и установки приложения как dialer по умолчанию
+    private void checkAndSetDefaultDialer() {
+        TelecomManager telecomManager = (TelecomManager) getSystemService(Context.TELECOM_SERVICE);
+        if (telecomManager != null) {
+            String currentDefaultDialer = telecomManager.getDefaultDialerPackage();
+            Log.d("MainActivity", "Текущий dialer по умолчанию: " + currentDefaultDialer);
+
+            if (!currentDefaultDialer.equals(getPackageName())) {
+                Log.d("MainActivity", "Наше приложение не dialer, показываем диалог назначения.");
+                offerReplacingDefaultDialer();
+            } else {
+                Log.d("MainActivity", "Наше приложение уже dialer по умолчанию.");
+                checkAndRequestPermissions();
+            }
+        } else {
+            Log.e("MainActivity", "Не удалось получить TelecomManager.");
+        }
+    }
+
+    private void offerReplacingDefaultDialer() {
+        if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M){
+            Intent intent = new Intent(TelecomManager.ACTION_CHANGE_DEFAULT_DIALER);
+            intent.putExtra(TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME,
+                    this.getPackageName());
+            startActivity(intent);
+
+        }
+        if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q){
+            RoleManager roleManager = (RoleManager) getSystemService(ROLE_SERVICE);
+            Intent intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_DIALER);
+            startActivityForResult(intent, CHANGE_DEFAULT_DIALER_CODE);
+        }
+    }
+
 
     // Метод для проверки всех необходимых разрешений
     private void checkAndRequestPermissions() {
@@ -66,19 +109,6 @@ public class MainActivity extends AppCompatActivity {
                 Manifest.permission.CALL_PHONE
         };
 
-        boolean shouldShowRationale = false;
-        for (String permission : permissions) {
-            if (ActivityCompat.shouldShowRequestPermissionRationale(this, permission)) {
-                shouldShowRationale = true;
-                break;
-            }
-        }
-
-        if (shouldShowRationale) {
-            Toast.makeText(this, "Приложению нужны разрешения для корректной работы.", Toast.LENGTH_LONG).show();
-        }
-
-        // Запрашиваем недостающие разрешения
         ActivityCompat.requestPermissions(this, permissions, PERMISSION_REQUEST_CODE);
     }
 
@@ -87,20 +117,30 @@ public class MainActivity extends AppCompatActivity {
         if (Build.VERSION.SDK_INT >= 33) {
             NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
             if (!notificationManager.areNotificationsEnabled()) {
-                // Проверяем, был ли выбран параметр "не спрашивать снова"
-                if (!ActivityCompat.shouldShowRequestPermissionRationale(this, "android.permission.POST_NOTIFICATIONS")) {
-                    // Если уведомления были отклонены ранее, сразу предлагаем перейти в настройки
-                    showGoToSettingsDialog();
-                } else {
-                    // Запрашиваем разрешение на уведомления
-                    ActivityCompat.requestPermissions(this, new String[]{"android.permission.POST_NOTIFICATIONS"}, NOTIFICATION_PERMISSION_REQUEST_CODE);
-                }
+                showGoToSettingsDialog();  // Предлагаем пользователю открыть настройки
                 return;
             }
         }
 
         // Если все разрешения предоставлены, запускаем сервис и закрываем активность
-        startServiceAndFinish();
+        startServiceAndClose();
+    }
+
+    // Метод для обработки результата выбора приложения dialer по умолчанию
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (requestCode == REQUEST_SET_DEFAULT_DIALER) {
+            TelecomManager telecomManager = (TelecomManager) getSystemService(Context.TELECOM_SERVICE);
+            if (telecomManager != null && telecomManager.getDefaultDialerPackage().equals(getPackageName())) {
+                // Приложение успешно назначено dialer по умолчанию
+                checkAndRequestPermissions();
+            } else {
+                Toast.makeText(this, "Приложение не назначено dialer по умолчанию", Toast.LENGTH_LONG).show();
+                finish();  // Завершаем, если пользователь отказался
+            }
+        }
     }
 
     // Обработка результата запроса разрешений
@@ -113,39 +153,14 @@ public class MainActivity extends AppCompatActivity {
                 // Проверяем разрешение на уведомления
                 checkNotificationPermission();
             } else {
-                // Если разрешения не предоставлены
-                boolean shouldShowRationale = false;
-                for (String permission : permissions) {
-                    if (ActivityCompat.shouldShowRequestPermissionRationale(this, permission)) {
-                        shouldShowRationale = true;
-                        break;
-                    }
-                }
-
-                if (!shouldShowRationale) {
-                    // Если выбрано "не спрашивать снова"
-                    showGoToSettingsDialog();
-                } else {
-                    Toast.makeText(this, "Разрешения отклонены.", Toast.LENGTH_SHORT).show();
-                }
-            }
-        } else if (requestCode == NOTIFICATION_PERMISSION_REQUEST_CODE) {
-            // Обработка результата запроса разрешений для уведомлений
-            if (Build.VERSION.SDK_INT >= 33) {
-                NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-                if (notificationManager != null && notificationManager.areNotificationsEnabled()) {
-                    // Если разрешение на уведомления предоставлено, запускаем сервис
-                    startServiceAndFinish();
-                } else {
-                    Toast.makeText(this, "Разрешение на уведомления отклонено. Перейдите в настройки, чтобы включить его.", Toast.LENGTH_LONG).show();
-                }
+                showGoToSettingsDialog();  // Если разрешения отклонены
             }
         }
     }
 
     // Метод для показа диалога с предложением открыть настройки
     private void showGoToSettingsDialog() {
-        Toast.makeText(this, "Разрешение на уведомления отклонено. Перейдите в настройки, чтобы предоставить его.", Toast.LENGTH_LONG).show();
+        Toast.makeText(this, "Необходимо предоставить разрешения. Перейдите в настройки приложения.", Toast.LENGTH_LONG).show();
         new Handler().postDelayed(() -> {
             Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
             Uri uri = Uri.fromParts("package", getPackageName(), null);
@@ -166,7 +181,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // Метод для запуска сервиса и закрытия активности
-    private void startServiceAndFinish() {
+    private void startServiceAndClose() {
         Intent serviceIntent = new Intent(this, ForegroundCallService.class);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(serviceIntent);
