@@ -49,7 +49,7 @@ public class ForegroundNotificationService extends Service {
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("Сервис отклонения неизвестных номеров работает")
                 .setContentText("Нажмите 'Отключить' для остановки")
-                .setSmallIcon(R.drawable.ic_phone)
+                .setSmallIcon(R.drawable.base)
                 .addAction(R.drawable.ic_stop, "Отключить", stopSelfPendingIntent)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setOngoing(true)  // Постоянное уведомление

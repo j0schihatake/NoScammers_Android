@@ -21,9 +21,6 @@ import androidx.core.app.NotificationCompat;
 import com.example.noscammer.R;
 import com.example.noscammer.CallManager;
 
-import java.util.HashSet;
-import java.util.Set;
-
 public class ForegroundCallService extends InCallService {
 
     private static final String TAG = "ForegroundCallService";
