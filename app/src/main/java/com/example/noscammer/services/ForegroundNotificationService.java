@@ -8,31 +8,28 @@ import android.app.Service;
 import android.content.Intent;
 import android.os.Build;
 import android.os.IBinder;
-import android.util.Log;
 import androidx.core.app.NotificationCompat;
+import com.example.noscammer.MainActivity;
 import com.example.noscammer.R;
 
 public class ForegroundNotificationService extends Service {
 
     private static final String CHANNEL_ID = "call_service_channel";
     private static final String STOP_SERVICE_ACTION = "STOP_SERVICE";
-    private static final String TAG = "ForegroundNotificationService";
 
     @Override
     public void onCreate() {
         super.onCreate();
-        Log.d(TAG, "ForegroundNotificationService запущен");
         startForegroundService();
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && STOP_SERVICE_ACTION.equals(intent.getAction())) {
-            Log.d(TAG, "Запрос на остановку сервиса");
             stopForeground(true);  // Останавливаем Foreground Service
             stopSelf();  // Останавливаем сам сервис
         }
-        return START_STICKY;  // Чтобы сервис продолжал работать
+        return START_STICKY;  // Чтобы сервис перезапускался при необходимости
     }
 
     @Override
@@ -41,6 +38,7 @@ public class ForegroundNotificationService extends Service {
     }
 
     private void startForegroundService() {
+
         createNotificationChannel();
 
         Intent stopSelfIntent = new Intent(this, ForegroundNotificationService.class);
@@ -78,7 +76,6 @@ public class ForegroundNotificationService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        Log.d(TAG, "ForegroundNotificationService остановлен");
         stopForeground(true);  // Убедись, что сервис остановлен
     }
 }

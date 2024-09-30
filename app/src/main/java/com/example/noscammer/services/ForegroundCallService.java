@@ -1,9 +1,16 @@
 package com.example.noscammer.services;
 
+import android.content.Context;
 import android.content.Intent;
+import android.database.Cursor;
+import android.net.Uri;
+import android.provider.ContactsContract;
 import android.telecom.Call;
 import android.telecom.InCallService;
 import android.util.Log;
+
+import java.util.HashSet;
+import java.util.Set;
 
 public class ForegroundCallService extends InCallService {
 
@@ -12,21 +19,49 @@ public class ForegroundCallService extends InCallService {
     @Override
     public void onCallAdded(Call call) {
         super.onCallAdded(call);
-        Log.d(TAG, "Новый звонок добавлен: " + call.getDetails().getHandle().getSchemeSpecificPart());
+        call.registerCallback(callCallback);
 
-        try {
-            // Регистрируем callback для изменений состояния звонка
-            call.registerCallback(callCallback);
+        // Получаем номер звонка
+        String incomingNumber = call.getDetails().getHandle().getSchemeSpecificPart();
+        Set<String> contacts = getAllContactNumbers(this);
 
-            // Если звонок входящий и номер неизвестен, отклоняем его
-            if (call.getState() == Call.STATE_RINGING) {
-                Log.d(TAG, "Входящий звонок, проверка отклонения...");
-                rejectCall(call);
+        // Если номер есть в контактах, не вмешиваемся
+        if (contacts.contains(incomingNumber)) {
+            Log.d("CallReceiver", "Номер найден в контактах: " + incomingNumber);
+            return;  // Система Android продолжит обрабатывать звонок
+        }
+
+        // Если номер не найден в контактах, отклоняем звонок
+        rejectCall(call);
+    }
+
+    private Set<String> getAllContactNumbers(Context context) {
+        Set<String> contacts = new HashSet<>();
+        Uri uri = ContactsContract.CommonDataKinds.Phone.CONTENT_URI;
+        String[] projection = {ContactsContract.CommonDataKinds.Phone.NUMBER};
+        Cursor cursor = context.getContentResolver().query(uri, projection, null, null, null);
+
+        if (cursor != null) {
+            while (cursor.moveToNext()) {
+                String phoneNumber = cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.Phone.NUMBER));
+                contacts.add(phoneNumber.replaceAll("\\s+", ""));  // Убираем пробелы из номеров для корректного сравнения
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Ошибка при добавлении звонка: " + e.getMessage());
+            cursor.close();
+        } else {
+            Log.e("CallReceiver", "Не удалось получить список контактов.");
+        }
+
+        return contacts;  // Возвращаем множество номеров
+    }
+
+
+    private void rejectCall(Call call) {
+        if (call != null && call.getState() == Call.STATE_RINGING) {
+            call.reject(false, null);  // Отклоняем звонок
+            Log.d("CallReceiver", "Звонок отклонен.");
         }
     }
+
 
     @Override
     public void onCallRemoved(Call call) {
@@ -51,20 +86,6 @@ public class ForegroundCallService extends InCallService {
             }
         }
     };
-
-    // Метод для отклонения звонка
-    private void rejectCall(Call call) {
-        try {
-            if (call != null && call.getState() == Call.STATE_RINGING) {
-                Log.d(TAG, "Отклоняем звонок.");
-                call.reject(false, null);  // Отклоняем входящий звонок
-            } else {
-                Log.d(TAG, "Звонок не в состоянии звонка, пропускаем.");
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Ошибка при отклонении звонка: " + e.getMessage());
-        }
-    }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {

@@ -19,12 +19,12 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
-import com.example.noscammer.services.ForegroundCallService;
 import com.example.noscammer.services.ForegroundNotificationService;
 
 public class MainActivity extends AppCompatActivity {
 
     private static final int PERMISSION_REQUEST_CODE = 100;
+    private static final int NOTIFICATION_PERMISSION_REQUEST_CODE = 101;
     private static final int REQUEST_SET_DEFAULT_DIALER = 123;
     private static final String TAG = "MainActivity";
 
@@ -33,7 +33,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         Log.d(TAG, "onCreate: Начало");
 
-        // Проверяем и устанавливаем приложение как dialer по умолчанию
+        // Проверяем, назначено ли наше приложение dialer по умолчанию
         checkAndSetDefaultDialer();
     }
 
@@ -69,7 +69,7 @@ public class MainActivity extends AppCompatActivity {
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             Intent intent = new Intent(TelecomManager.ACTION_CHANGE_DEFAULT_DIALER);
             intent.putExtra(TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME, getPackageName());
-            startActivity(intent);
+            startActivityForResult(intent, REQUEST_SET_DEFAULT_DIALER);
         }
     }
 
