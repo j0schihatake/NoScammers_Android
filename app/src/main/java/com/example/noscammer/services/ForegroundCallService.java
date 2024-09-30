@@ -46,12 +46,12 @@ public class ForegroundCallService extends Service {
 
         // Создаем уведомление
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("Сервис отклонение неизвестных номеров работает")
+                .setContentTitle("Сервис отклонения неизвестных номеров работает")
                 .setContentText("Нажмите 'Отключить' для остановки")
                 .setSmallIcon(R.drawable.ic_phone)
                 .addAction(R.drawable.ic_stop, "Отключить", stopSelfPendingIntent)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setOngoing(true)  // Постоянное уведомление
+                .setOngoing(true)                                                                   // Постоянное уведомление
                 .build();
 
         // Запускаем сервис на переднем плане
@@ -75,6 +75,6 @@ public class ForegroundCallService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        stopForeground(true);  // Убедись, что сервис остановлен
+        stopForeground(true);                                                        // Убедись, что сервис остановлен
     }
 }
