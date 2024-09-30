@@ -155,13 +155,11 @@ public class ForegroundCallService extends InCallService {
                 removeIncomingCallNotification();  // Убираем уведомление после отклонения звонка
                 resetToBasicNotification();  // Возвращаем основную нотификацию
             } else if (ACTION_STOP_SERVICE.equals(action)) {
-                removeNotification(NOTIFICATION_ID); // Убираем основное уведомление
-                stopForeground(true);  // Останавливаем foreground service
-                stopSelf();  // Полностью останавливаем сервис
+                stopForegroundService();  // Полностью останавливаем сервис и убираем нотификации
             }
         }
 
-        return START_STICKY;
+        return START_NOT_STICKY;  // Теперь сервис не перезапускается после завершения
     }
 
     // Метод для обновления нотификации: убираем кнопку "Принять", оставляем "Отклонить"
@@ -211,10 +209,12 @@ public class ForegroundCallService extends InCallService {
         notificationManager.cancel(INCOMING_CALL_NOTIFICATION_ID);
     }
 
-    // Метод для удаления уведомления
-    private void removeNotification(int notificationId) {
+    // Метод для полной остановки сервиса и удаления всех уведомлений
+    private void stopForegroundService() {
         NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-        notificationManager.cancel(notificationId);
+        notificationManager.cancelAll();  // Убираем все нотификации
+        stopForeground(true);  // Останавливаем foreground service
+        stopSelf();  // Полностью останавливаем сервис
     }
 
     @Override
