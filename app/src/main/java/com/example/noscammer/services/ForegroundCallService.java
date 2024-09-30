@@ -1,21 +1,28 @@
 package com.example.noscammer.services;
 
+import static com.example.noscammer.CallUtils.rejectCall;
+
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.database.Cursor;
+import android.net.Uri;
 import android.os.Build;
+import android.provider.ContactsContract;
 import android.telecom.Call;
 import android.telecom.InCallService;
 import android.util.Log;
 
 import androidx.core.app.NotificationCompat;
 
-import com.example.noscammer.CallUtils;
 import com.example.noscammer.R;
 import com.example.noscammer.CallManager;
+
+import java.util.HashSet;
+import java.util.Set;
 
 public class ForegroundCallService extends InCallService {
 
@@ -75,20 +82,29 @@ public class ForegroundCallService extends InCallService {
         String incomingNumber = call.getDetails().getHandle().getSchemeSpecificPart();
         Log.d(TAG, "Номер входящего звонка: " + incomingNumber);
 
-        // Если номер в контактах, показываем уведомление с опциями
-        if (CallUtils.isNumberInContacts(incomingNumber, getApplicationContext())) {
+        // Игнорируем VoIP-звонки (например, WhatsApp, Telegram и т.д.)
+        if (isVoIPCall(call)) {
+            Log.d(TAG, "VoIP-звонок обнаружен, игнорируем его.");
+            return;
+        }
+
+        // Проверяем, есть ли имя контакта для данного номера
+        String contactName = getContactName(incomingNumber, getApplicationContext());
+
+        // Если номер в контактах, показываем уведомление с именем и опциями
+        if (contactName != null) {
             Log.d(TAG, "Номер найден в контактах, показываем уведомление.");
             CallManager.setCurrentCall(call);  // Сохраняем текущий звонок
-            showIncomingCallNotification(incomingNumber);  // Показываем уведомление
+            showIncomingCallNotification(contactName, incomingNumber);  // Показываем уведомление
         } else {
             // Если номер не в контактах, отклоняем звонок
             Log.d(TAG, "Номер не в контактах, отклоняем звонок.");
-            CallUtils.rejectCall(call);
+            rejectCall(call);
         }
     }
 
     // Метод для отображения уведомления с кнопками "Принять" и "Отклонить"
-    private void showIncomingCallNotification(String incomingNumber) {
+    private void showIncomingCallNotification(String contactName, String incomingNumber) {
         NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         createIncomingCallNotificationChannel(notificationManager);
 
@@ -100,11 +116,11 @@ public class ForegroundCallService extends InCallService {
         rejectIntent.setAction(ACTION_REJECT_CALL);
         PendingIntent rejectPendingIntent = PendingIntent.getService(this, 1, rejectIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
-        // Уведомление о входящем звонке
+        // Уведомление о входящем звонке с отображением имени контакта или номера
         Notification notification = new NotificationCompat.Builder(this, INCOMING_CALL_CHANNEL_ID)
-                .setContentTitle("Входящий звонок")
+                .setContentTitle("Входящий звонок от: " + (contactName != null ? contactName : incomingNumber))
                 .setContentText("Номер: " + incomingNumber)
-                .setSmallIcon(R.drawable.ic_phone)
+                .setSmallIcon(R.drawable.base)
                 .addAction(R.drawable.ic_phone, "Принять", acceptPendingIntent)
                 .addAction(R.drawable.ic_stop, "Отклонить", rejectPendingIntent)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -139,7 +155,8 @@ public class ForegroundCallService extends InCallService {
                 currentCall.reject(false, null);
                 removeNotification();  // Убираем уведомление после отклонения звонка
             } else if (ACTION_STOP_SERVICE.equals(action)) {
-                stopSelf();
+                stopForeground(true);  // Останавливаем foreground service
+                stopSelf();  // Полностью останавливаем сервис
             }
         }
 
@@ -168,4 +185,28 @@ public class ForegroundCallService extends InCallService {
             Log.d(TAG, "Состояние звонка изменено: " + state);
         }
     };
+
+    // Метод для определения VoIP-звонка
+    private boolean isVoIPCall(Call call) {
+        Uri handle = call.getDetails().getHandle();
+        String scheme = handle.getScheme();
+        return scheme != null && (scheme.equalsIgnoreCase("sip") || scheme.contains("whatsapp") || scheme.contains("telegram"));
+    }
+
+    // Метод для получения имени контакта по номеру
+    private String getContactName(String phoneNumber, Context context) {
+        Uri uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(phoneNumber));
+        String[] projection = {ContactsContract.PhoneLookup.DISPLAY_NAME};
+
+        Cursor cursor = context.getContentResolver().query(uri, projection, null, null, null);
+        if (cursor != null) {
+            if (cursor.moveToFirst()) {
+                String contactName = cursor.getString(cursor.getColumnIndex(ContactsContract.PhoneLookup.DISPLAY_NAME));
+                cursor.close();
+                return contactName;
+            }
+            cursor.close();
+        }
+        return null;  // Имя контакта не найдено
+    }
 }
