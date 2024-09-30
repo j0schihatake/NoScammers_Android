@@ -28,13 +28,22 @@ public class ForegroundCallService extends InCallService {
         // Если номер есть в контактах, не вмешиваемся
         if (contacts.contains(incomingNumber)) {
             Log.d("CallReceiver", "Номер найден в контактах: " + incomingNumber);
-            return;  // Система Android продолжит обрабатывать звонок
+            // Ничего не делаем, позволяем стандартной системе обработать звонок
+            return;
         }
 
         // Если номер не найден в контактах, отклоняем звонок
         rejectCall(call);
     }
 
+    private void rejectCall(Call call) {
+        if (call != null && call.getState() == Call.STATE_RINGING) {
+            call.reject(false, null);  // Отклоняем звонок
+            Log.d("CallReceiver", "Звонок отклонен.");
+        }
+    }
+
+    // Метод для получения всех номеров из телефонной книги
     private Set<String> getAllContactNumbers(Context context) {
         Set<String> contacts = new HashSet<>();
         Uri uri = ContactsContract.CommonDataKinds.Phone.CONTENT_URI;
@@ -51,17 +60,8 @@ public class ForegroundCallService extends InCallService {
             Log.e("CallReceiver", "Не удалось получить список контактов.");
         }
 
-        return contacts;  // Возвращаем множество номеров
+        return contacts;
     }
-
-
-    private void rejectCall(Call call) {
-        if (call != null && call.getState() == Call.STATE_RINGING) {
-            call.reject(false, null);  // Отклоняем звонок
-            Log.d("CallReceiver", "Звонок отклонен.");
-        }
-    }
-
 
     @Override
     public void onCallRemoved(Call call) {
