@@ -26,12 +26,14 @@ public class MainActivity extends AppCompatActivity {
 
     private static final int PERMISSION_REQUEST_CODE = 100;
     private static final int REQUEST_SET_DEFAULT_DIALER = 123;
+    private static final String TAG = "MainActivity";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Log.d(TAG, "onCreate: Начало");
 
-        // Проверяем, назначено ли наше приложение dialer по умолчанию
+        // Проверяем и устанавливаем приложение как dialer по умолчанию
         checkAndSetDefaultDialer();
     }
 
@@ -40,41 +42,42 @@ public class MainActivity extends AppCompatActivity {
         TelecomManager telecomManager = (TelecomManager) getSystemService(Context.TELECOM_SERVICE);
         if (telecomManager != null) {
             String currentDefaultDialer = telecomManager.getDefaultDialerPackage();
-            Log.d("MainActivity", "Текущий dialer по умолчанию: " + currentDefaultDialer);
+            Log.d(TAG, "Текущий dialer по умолчанию: " + currentDefaultDialer);
 
             if (!currentDefaultDialer.equals(getPackageName())) {
-                Log.d("MainActivity", "Наше приложение не dialer, показываем диалог назначения.");
+                Log.d(TAG, "Наше приложение не dialer, показываем диалог назначения.");
                 offerReplacingDefaultDialer();
             } else {
-                Log.d("MainActivity", "Наше приложение уже dialer по умолчанию.");
+                Log.d(TAG, "Наше приложение уже dialer по умолчанию.");
+                // Если приложение уже назначено как dialer, проверяем разрешения
                 checkAndRequestPermissions();
             }
         } else {
-            Log.e("MainActivity", "Не удалось получить TelecomManager.");
+            Log.e(TAG, "Не удалось получить TelecomManager.");
         }
     }
 
     private static final int CHANGE_DEFAULT_DIALER_CODE = 25;
 
     private void offerReplacingDefaultDialer() {
-        if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            Intent intent = new Intent(TelecomManager.ACTION_CHANGE_DEFAULT_DIALER);
-            intent.putExtra(TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME,
-                    this.getPackageName());
-            startActivity(intent);
-        }
-        if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             RoleManager roleManager = (RoleManager) getSystemService(ROLE_SERVICE);
-            Intent intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_DIALER);
-            startActivityForResult(intent, CHANGE_DEFAULT_DIALER_CODE);
+            if (roleManager != null) {
+                Intent intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_DIALER);
+                startActivityForResult(intent, CHANGE_DEFAULT_DIALER_CODE);
+            }
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Intent intent = new Intent(TelecomManager.ACTION_CHANGE_DEFAULT_DIALER);
+            intent.putExtra(TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME, getPackageName());
+            startActivity(intent);
         }
     }
 
     // Метод для проверки всех необходимых разрешений
     private void checkAndRequestPermissions() {
         if (checkPermissions()) {
-            // Если все разрешения предоставлены, запускаем сервисы
-            startServices();
+            // Если все разрешения предоставлены, проверяем разрешение на уведомления
+            checkNotificationPermission();
         } else {
             // Запрашиваем разрешения
             requestPermissions();
@@ -109,6 +112,20 @@ public class MainActivity extends AppCompatActivity {
         ActivityCompat.requestPermissions(this, permissions, PERMISSION_REQUEST_CODE);
     }
 
+    // Метод для проверки разрешения на уведомления (для Android 13 и выше)
+    private void checkNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= 33) {
+            NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+            if (!notificationManager.areNotificationsEnabled()) {
+                showGoToSettingsDialog();  // Предлагаем пользователю открыть настройки
+                return;
+            }
+        }
+
+        // Если все разрешения предоставлены, запускаем сервис и закрываем активность
+        startServiceAndClose();
+    }
+
     // Метод для обработки результата выбора приложения dialer по умолчанию
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
@@ -133,7 +150,8 @@ public class MainActivity extends AppCompatActivity {
 
         if (requestCode == PERMISSION_REQUEST_CODE) {
             if (checkPermissions()) {
-                startServices();  // Запуск сервисов после получения разрешений
+                // Проверяем разрешение на уведомления
+                checkNotificationPermission();
             } else {
                 showGoToSettingsDialog();  // Если разрешения отклонены
             }
@@ -151,33 +169,27 @@ public class MainActivity extends AppCompatActivity {
         }, 2000); // Задержка перед переходом в настройки
     }
 
-    // Метод для запуска сервисов (уведомления и обработки звонков)
-    private void startServices() {
-        // Запускаем сервис уведомлений
-        Intent notificationServiceIntent = new Intent(this, ForegroundNotificationService.class);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(notificationServiceIntent);
-        } else {
-            startService(notificationServiceIntent);
-        }
-
-        // Запускаем InCallService для управления звонками
-        Intent callServiceIntent = new Intent(this, ForegroundCallService.class);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(callServiceIntent);
-        } else {
-            startService(callServiceIntent);
-        }
-
-        // Закрываем активность после запуска сервисов
-        finish();
-    }
-
     @Override
     protected void onResume() {
         super.onResume();
+
+        // Проверяем разрешения при возврате из настроек
         if (checkPermissions()) {
-            startServices();
+            // Проверяем разрешение на уведомления
+            checkNotificationPermission();
         }
+    }
+
+    // Метод для запуска сервиса и закрытия активности
+    private void startServiceAndClose() {
+        Intent serviceIntent = new Intent(this, ForegroundNotificationService.class);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent);
+        } else {
+            startService(serviceIntent);
+        }
+
+        // Закрываем активность после старта сервиса
+        finish();
     }
 }

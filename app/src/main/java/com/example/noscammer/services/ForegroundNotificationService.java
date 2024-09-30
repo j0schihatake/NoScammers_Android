@@ -8,28 +8,31 @@ import android.app.Service;
 import android.content.Intent;
 import android.os.Build;
 import android.os.IBinder;
+import android.util.Log;
 import androidx.core.app.NotificationCompat;
 import com.example.noscammer.R;
 
 public class ForegroundNotificationService extends Service {
 
-    private static final String CHANNEL_ID = "notification_service_channel";
+    private static final String CHANNEL_ID = "call_service_channel";
     private static final String STOP_SERVICE_ACTION = "STOP_SERVICE";
+    private static final String TAG = "ForegroundNotificationService";
 
     @Override
     public void onCreate() {
         super.onCreate();
+        Log.d(TAG, "ForegroundNotificationService запущен");
         startForegroundService();
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && STOP_SERVICE_ACTION.equals(intent.getAction())) {
+            Log.d(TAG, "Запрос на остановку сервиса");
             stopForeground(true);  // Останавливаем Foreground Service
             stopSelf();  // Останавливаем сам сервис
-            stopOtherServices();  // Останавливаем остальные сервисы
         }
-        return START_STICKY;
+        return START_STICKY;  // Чтобы сервис продолжал работать
     }
 
     @Override
@@ -44,15 +47,17 @@ public class ForegroundNotificationService extends Service {
         stopSelfIntent.setAction(STOP_SERVICE_ACTION);
         PendingIntent stopSelfPendingIntent = PendingIntent.getService(this, 0, stopSelfIntent, PendingIntent.FLAG_IMMUTABLE);
 
+        // Создаем уведомление
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("Приложение перехватывает звонки")
-                .setContentText("Нажмите 'Отключить', чтобы остановить сервис")
+                .setContentTitle("Сервис отклонения неизвестных номеров работает")
+                .setContentText("Нажмите 'Отключить' для остановки")
                 .setSmallIcon(R.drawable.ic_phone)
                 .addAction(R.drawable.ic_stop, "Отключить", stopSelfPendingIntent)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setOngoing(true)  // Постоянное уведомление
                 .build();
 
+        // Запускаем сервис на переднем плане
         startForeground(1, notification);
     }
 
@@ -60,7 +65,7 @@ public class ForegroundNotificationService extends Service {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID,
-                    "Notification Service Channel",
+                    "Call Service Channel",
                     NotificationManager.IMPORTANCE_HIGH
             );
             NotificationManager manager = (NotificationManager) getSystemService(NotificationManager.class);
@@ -73,12 +78,7 @@ public class ForegroundNotificationService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        stopForeground(true);  // Останавливаем уведомление
-    }
-
-    private void stopOtherServices() {
-        // Останавливаем сервисы при завершении работы
-        Intent callServiceIntent = new Intent(this, ForegroundCallService.class);
-        stopService(callServiceIntent);
+        Log.d(TAG, "ForegroundNotificationService остановлен");
+        stopForeground(true);  // Убедись, что сервис остановлен
     }
 }
