@@ -60,7 +60,10 @@ public class ForegroundCallService extends InCallService {
         startForeground(NOTIFICATION_ID, notification);
     }
 
-    // Метод для создания основного канала уведомлений
+    /**
+     * Метод для создания основного канала уведомлений
+     * @param notificationManager
+     */
     private void createNotificationChannel(NotificationManager notificationManager) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
@@ -101,7 +104,11 @@ public class ForegroundCallService extends InCallService {
         }
     }
 
-    // Метод для отображения уведомления с кнопками "Принять" и "Отклонить"
+    /**
+     * Отображает входящий телефонный звонок
+     * @param contactName
+     * @param incomingNumber
+     */
     private void showIncomingCallNotification(String contactName, String incomingNumber) {
         NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         createIncomingCallNotificationChannel(notificationManager);
@@ -128,7 +135,10 @@ public class ForegroundCallService extends InCallService {
         notificationManager.notify(INCOMING_CALL_NOTIFICATION_ID, builder.build());
     }
 
-    // Метод для создания канала уведомлений для входящих звонков
+    /**
+     * Создание канала уведомлений:
+     * @param notificationManager
+     */
     private void createIncomingCallNotificationChannel(NotificationManager notificationManager) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
@@ -148,21 +158,22 @@ public class ForegroundCallService extends InCallService {
             String action = intent.getAction();
             if (ACTION_ACCEPT_CALL.equals(action) && currentCall != null) {
                 currentCall.answer(Call.STATE_ACTIVE);
-                // Обновляем нотификацию: убираем кнопку "Принять", оставляем "Отклонить"
-                updateNotificationWithRejectOnly();
+                updateNotificationWithRejectOnly();                                                 // Обновляем нотификацию: убираем кнопку "Принять", оставляем "Отклонить"
             } else if (ACTION_REJECT_CALL.equals(action) && currentCall != null) {
                 currentCall.reject(false, null);
-                removeIncomingCallNotification();  // Убираем уведомление после отклонения звонка
-                resetToBasicNotification();  // Возвращаем основную нотификацию
+                removeIncomingCallNotification();                                                   // Убираем уведомление после отклонения звонка
+                resetToBasicNotification();                                                         // Возвращаем основную нотификацию
             } else if (ACTION_STOP_SERVICE.equals(action)) {
-                stopForegroundService();  // Полностью останавливаем сервис и убираем нотификации
+                stopForegroundService();                                                            // Полностью останавливаем сервис и убираем нотификации
             }
         }
 
-        return START_NOT_STICKY;  // Теперь сервис не перезапускается после завершения
+        return START_NOT_STICKY;                                                                    // Теперь сервис не перезапускается после завершения
     }
 
-    // Метод для обновления нотификации: убираем кнопку "Принять", оставляем "Отклонить"
+    /**
+     * Метод для обновления нотификации: убираем кнопку "Принять", оставляем "Отклонить"
+     */
     private void updateNotificationWithRejectOnly() {
         NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
 
@@ -181,7 +192,9 @@ public class ForegroundCallService extends InCallService {
         notificationManager.notify(INCOMING_CALL_NOTIFICATION_ID, builder.build());
     }
 
-    // Метод для возвращения к основной нотификации после завершения звонка
+    /**
+     * Метод для возвращения к основной нотификации после завершения звонка
+     */
     private void resetToBasicNotification() {
         NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
 
@@ -191,10 +204,10 @@ public class ForegroundCallService extends InCallService {
 
         // Основное уведомление
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("Сервис активен")
-                .setContentText("Сервис работает для отклонения неизвестных номеров")
+                .setContentTitle("Сервис отклонения неизвестных номеров работает")
+                .setContentText("Для отключения измините приложение для звонков по умолчанию")
                 .setSmallIcon(R.drawable.base)
-                .addAction(R.drawable.ic_stop, "Отключить", stopSelfPendingIntent) // Кнопка "Отключить"
+                //.addAction(R.drawable.ic_stop, "Отключить", stopSelfPendingIntent) // Кнопка "Отключить"
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setOngoing(true)
                 .build();
@@ -203,13 +216,17 @@ public class ForegroundCallService extends InCallService {
         notificationManager.notify(NOTIFICATION_ID, notification);
     }
 
-    // Метод для удаления уведомления о звонке
+    /**
+     * Метод для удаления уведомления о звонке
+     */
     private void removeIncomingCallNotification() {
         NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         notificationManager.cancel(INCOMING_CALL_NOTIFICATION_ID);
     }
 
-    // Метод для полной остановки сервиса и удаления всех уведомлений
+    /**
+     * Метод для полной остановки сервиса и удаления всех уведомлений
+     */
     private void stopForegroundService() {
         NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         notificationManager.cancelAll();  // Убираем все нотификации
@@ -233,14 +250,23 @@ public class ForegroundCallService extends InCallService {
         }
     };
 
-    // Метод для определения VoIP-звонка
+    /**
+     * Метод для определения VoIP-звонка
+     * @param call
+     * @return
+     */
     private boolean isVoIPCall(Call call) {
         Uri handle = call.getDetails().getHandle();
         String scheme = handle.getScheme();
         return scheme != null && (scheme.equalsIgnoreCase("sip") || scheme.contains("whatsapp") || scheme.contains("telegram"));
     }
 
-    // Метод для получения имени контакта по номеру
+    /**
+     * Метод для получения имени контакта по номеру
+     * @param phoneNumber
+     * @param context
+     * @return
+     */
     private String getContactName(String phoneNumber, Context context) {
         Uri uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(phoneNumber));
         String[] projection = {ContactsContract.PhoneLookup.DISPLAY_NAME};
@@ -254,6 +280,6 @@ public class ForegroundCallService extends InCallService {
             }
             cursor.close();
         }
-        return null;  // Имя контакта не найдено
+        return null;                                                                                // Имя контакта не найдено
     }
 }
