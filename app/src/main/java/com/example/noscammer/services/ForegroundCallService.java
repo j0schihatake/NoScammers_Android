@@ -204,8 +204,8 @@ public class ForegroundCallService extends InCallService {
 
         // Основное уведомление
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("Сервис отклонения неизвестных номеров работает")
-                .setContentText("Для отключения измините приложение для звонков по умолчанию")
+                .setContentTitle(CallManager.mainNotificationTitleMessage)
+                .setContentText(CallManager.mainNotificationMessage)
                 .setSmallIcon(R.drawable.base)
                 //.addAction(R.drawable.ic_stop, "Отключить", stopSelfPendingIntent) // Кнопка "Отключить"
                 .setPriority(NotificationCompat.PRIORITY_LOW)
